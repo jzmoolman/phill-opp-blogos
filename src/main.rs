@@ -4,12 +4,25 @@
 #![test_runner(crate::test_runner)]
 #![reexport_test_harness_main = "test_main"]
 
-
-use core::fmt::Write;
 use core::panic::PanicInfo;
 
 mod vga_buffer;
 mod serial;
+
+pub trait Testable {
+    fn run(&self);
+}
+
+impl<T> Testable for T
+where
+    T: Fn(),
+{
+    fn run(&self) {
+        serial_print!("{}...\t", core::any::type_name::<T>());
+        self();
+        serial_println!("[ok]");
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u32)]
@@ -51,24 +64,21 @@ pub extern "C" fn _start() -> ! {
 
     #[cfg(test)]
     test_main();
-
+    #[allow(clippy::empty_loop)]
     loop {}
 }
 
 #[cfg(test)]
-pub fn test_runner(tests: &[&dyn Fn()]) {
+pub fn test_runner(tests: &[&dyn Testable]) {
     // println!("Running {} tests", tests.len());
     serial_println!("Running {} test", tests.len());
     for test in tests {
-        test();
+        test.run();
     }
     exit_qemu(QemuExitCode::Success);
 }
 
 #[test_case]
 fn trivial_assertion() {
-    //print!("trivial assertion... ");
-    serial_println!("trivial assertion... ");
     assert_eq!(1, 1);
-    println!("[ok]");
 }
